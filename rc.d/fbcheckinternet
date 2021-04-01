@@ -1,0 +1,62 @@
+#!/bin/sh
+
+ADDON_NAME=fbcheckinternet
+RC_DIR=/usr/local/etc/config/rc.d
+WWW_DIR=/usr/local/etc/config/addons/www/$ADDON_NAME
+ADDON_DIR=/usr/local/addons/${ADDON_NAME}
+
+case "$1" in
+  ""|init|start)
+    if [ ! -e /bin/checkInternet.orig ] && [ ! -L /bin/checkInternet ]; then
+  	  logger -t ${ADDON_NAME} -p user.info "Replacing /bin/checkInternet with symlink to ${ADDON_DIR}/bin/fbcheckinternet.tcl"
+      mount -o remount,rw /
+      mv /bin/checkInternet /bin/checkInternet.orig
+      ln -s ${ADDON_DIR}/bin/fbcheckinternet.tcl /bin/checkInternet
+      sync
+      mount -o remount,ro
+    fi
+  ;;
+  info)
+    echo "Info: <b>FRITZ!Box Internet Check Addon</b><br />"
+    echo "Version: $(cat ${ADDON_DIR}/VERSION)"
+    echo "Name: FRITZ!Box Internet Check"
+    echo "Operations: uninstall"
+    echo "Update: /addons/${ADDON_NAME}/update-check.cgi"
+  ;;
+  uninstall)
+    #Restore original /bin/checkInternet
+    if [ -L /bin/checkInternet ] && [ -e /bin/checkInternet.orig ]; then
+      logger -t ${ADDON_NAME} -p user.info "Restoring /bin/checkInternet"
+      mount -o remount,rw /
+      rm /bin/checkInternet
+      mv /bin/checkInternet.orig /bin/checkInternet
+      sync
+      mount -o remount,ro /
+    fi
+    
+    #Remove cron job
+    if grep -q "${ADDON_DIR}/bin/fbcheckinternet.tcl" /usr/local/crontabs/root 2>/dev/null; then
+      TMPFILE=`mktemp`
+      SED=`mktemp`
+      echo ${ADDON_DIR}/bin/fbcheckinternet.tcl | sed -e 's/\//\\\//g' > ${SED}
+      sed "/`cat ${SED}`/d" /usr/local/crontabs/root > ${TMPFILE}
+      cat $TMPFILE > /usr/local/crontabs/root
+      rm -f ${TMPFILE}
+      rm -f ${SED}
+    fi
+  
+    #Re-Enable Built-in Internet Check
+    if [ -e /etc/config/internetCheckDisabled ]; then
+      rm -f /etc/config/internetCheckDisabled
+    fi
+  
+    #Remove Addon Files
+    rm -rf ${ADDON_DIR}
+    rm -rf ${WWW_DIR}
+    rm -f ${RC_DIR}/${ADDON_NAME}
+  ;;
+  *)
+    echo "Usage: $ADDON_NAME {start|info|uninstall}" >&2
+    exit 1
+  ;;
+esac
