@@ -1,8 +1,11 @@
 #!/bin/tclsh
-# if user doesn't want this script to be running
-if { [file exists /etc/config/internetCheckDisabled] == 1} {            
-  exit 0                                                          
-} 
+
+# if this script replaces /bin/checkInternet, set also the system stateFile, otherwise set our stateFile
+if { [file exists /etc/config/fbReplaceCheckInternet] == 1} {
+	set stateFile "/var/status/hasInternet"
+} else {
+	set stateFile "/var/status/hasInternetFritzBox"
+}
 
 load tclrega.so
 
@@ -35,7 +38,6 @@ if(svObj.Value() != $value) {
 }
 
 if { [catch {
-	set stateFile "/var/status/hasInternet"
 	set url "http://fritz.box:49000/igdupnp/control/WANIPConn1"
 	set header "SoapAction urn:schemas-upnp-org:service:WANIPConnection:1#GetStatusInfo"
 
@@ -85,7 +87,6 @@ if { [catch {
 			file delete $stateFile
 		}
 	}
-	
 } errorString] } {
     setSysVar 7
 	file delete $stateFile

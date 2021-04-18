@@ -9,6 +9,7 @@ rm -rf tmp/*
 # copy all relevant stuff
 cp -a update_script tmp/
 cp -a bin tmp/
+cp -a etc tmp/
 cp -a rc.d tmp/
 cp -a www tmp/
 cp -a VERSION tmp/

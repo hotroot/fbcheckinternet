@@ -2,63 +2,32 @@
 
 ADDON_NAME=fbcheckinternet
 RC_DIR=/usr/local/etc/config/rc.d
-WWW_DIR=/usr/local/etc/config/addons/www/$ADDON_NAME
+WWW_DIR=/usr/local/etc/config/addons/www/${ADDON_NAME}
 ADDON_DIR=/usr/local/addons/${ADDON_NAME}
 
 mount | grep /usr/local 2>&1 >/dev/null
 if [ $? -eq 1 ]; then
-  mount /usr/local
+	mount /usr/local
 fi
 
 #Copy Files
 mkdir -p ${ADDON_DIR}
 mkdir -p ${WWW_DIR}
 cp -af bin ${ADDON_DIR}
+chmod 755 ${ADDON_DIR}/bin/*
 cp -f VERSION ${ADDON_DIR}
-cp -f rc.d/fbcheckinternet ${RC_DIR}
+cp -f rc.d/${ADDON_NAME} ${RC_DIR}
+chmod +x ${RC_DIR}/${ADDON_NAME}
 cp -f www/update-check.cgi ${WWW_DIR}
+chmod 755 ${WWW_DIR}/*
 
-#Replace Buildin checkInternet with our version
-if [ ! -e /bin/checkInternet.orig ] && [ ! -L /bin/checkInternet ]; then
-  mount -o remount,rw /
-  mv /bin/checkInternet /bin/checkInternet.orig
-  ln -s ${ADDON_DIR}/bin/fbcheckinternet.tcl /bin/checkInternet
-  sync
-  mount -o remount,ro
+#Copy monit config only if monit exists
+if [ -x /usr/bin/monit ]; then
+	cp -f etc/monit_fbcheckinternet.cfg /usr/local/etc/
+	/usr/bin/monit reload
 fi
 
-#Re-Enable Internet Check if disabled
-if [ -e /etc/config/internetCheckDisabled ]; then
-  rm -f /etc/config/internetCheckDisabled
-fi
-
-#Remove old monit config
-if [ -e /usr/local/etc/monit_fbcheckinternet.cfg ]; then
-  rm -f /usr/local/etc/monit_fbcheckinternet.cfg
-  if [ -x /usr/bin/monit ]; then
-    /usr/bin/monit reload
-  fi
-fi
-
-#Remove old Cron Job
-if grep -q "${ADDON_DIR}/bin/fbcheckinternet.tcl" /usr/local/crontabs/root 2>/dev/null; then
-  TMPFILE=`mktemp`
-  SED=`mktemp`
-  echo $ADDON_DIR/bin/fbcheckinternet.tcl | sed -e 's/\//\\\//g' > ${SED}
-  sed "/`cat ${SED}`/d" /usr/local/crontabs/root > ${TMPFILE}
-  cat $TMPFILE > /usr/local/crontabs/root
-  rm -f ${TMPFILE}
-  rm -f ${SED}
-  if [ -x /usr/bin/monit ]; then
-    /usr/bin/monit restart crond
-  fi
-
-fi
-
-#Add cron job only for CCU2 because /bin/checkInternet is not executed periodically by hss_led
-if [ "$1" = "CCU2" ]; then
-  echo "*/3 * * * * ${ADDON_DIR}/bin/fbcheckinternet.tcl" >>/usr/local/crontabs/root
-fi
+${RC_DIR}/${ADDON_NAME} init
 
 sync
 exit 0
